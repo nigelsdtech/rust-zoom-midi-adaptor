@@ -33,18 +33,68 @@ jobs:
             rustup default stable
             cargo build --release
             mkdir -p dist
-            cp target/release/zoom-midi-adaptor dist/zoom-midi-adaptor-aarch64-unknown-linux-gnu
-            sha256sum dist/zoom-midi-adaptor-aarch64-unknown-linux-gnu > dist/zoom-midi-adaptor-aarch64-unknown-linux-gnu.sha256
+            cp target/release/zoom-midi-adaptor dist/zoom-midi-adaptor
+            sha256sum dist/zoom-midi-adaptor > dist/zoom-midi-adaptor.sha256
+
+      - name: Prepare deployment package
+        run: |
+          mkdir -p deploy/zoom-midi-adaptor
+          cp dist/zoom-midi-adaptor deploy/zoom-midi-adaptor/
+          cp dist/zoom-midi-adaptor.sha256 deploy/zoom-midi-adaptor/
+          cp zoom-midi-adaptor.service deploy/zoom-midi-adaptor/
+          cp config/pedalboard.json deploy/zoom-midi-adaptor/
+          cp README.md deploy/zoom-midi-adaptor/DEPLOYMENT.md
+          
+          # Create Pi install script
+          cat > deploy/zoom-midi-adaptor/install.sh << 'EOF'
+          #!/bin/bash
+          set -eux
+          
+          # Adjust for your user if not dietpi
+          USER=${1:-dietpi}
+          
+          echo "Installing zoom-midi-adaptor for user $USER..."
+          
+          # Install binary
+          sudo install -Dm755 ./zoom-midi-adaptor /usr/local/bin/zoom-midi-adaptor
+          
+          # Install config
+          sudo install -d /etc/zoom-midi-adaptor
+          sudo install -m644 ./pedalboard.json /etc/zoom-midi-adaptor/pedalboard.json
+          
+          # Install systemd service
+          sudo install -Dm644 ./zoom-midi-adaptor.service /etc/systemd/system/zoom-midi-adaptor.service
+          
+          # Adjust service file if needed
+          if [ "$USER" != "pi" ]; then
+            sudo sed -i "s/User=pi/User=$USER/" /etc/systemd/system/zoom-midi-adaptor.service
+            sudo sed -i "s/Group=pi/Group=$USER/" /etc/systemd/system/zoom-midi-adaptor.service
+          fi
+          
+          # Enable and start
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now zoom-midi-adaptor
+          sudo systemctl status zoom-midi-adaptor
+          
+          echo "Done! Check logs with: journalctl -u zoom-midi-adaptor -f"
+          EOF
+          chmod +x deploy/zoom-midi-adaptor/install.sh
+          
+          # Create zip
+          cd deploy
+          zip -r zoom-midi-adaptor-aarch64.zip zoom-midi-adaptor/
+          cd ..
+          ls -lh deploy/zoom-midi-adaptor-aarch64.zip
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zoom-midi-adaptor-aarch64
-          path: dist/*
+          name: zoom-midi-adaptor-aarch64-bundle
+          path: deploy/zoom-midi-adaptor-aarch64.zip
 
       - name: Publish release assets
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: deploy/zoom-midi-adaptor-aarch64.zip
           generate_release_notes: true

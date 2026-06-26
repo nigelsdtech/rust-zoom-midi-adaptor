@@ -17,37 +17,44 @@ jobs:
           components: rustfmt
       - run: cargo fmt -- --check
 
-  clippy:
-    name: Clippy
+  checks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Clippy
+            command: cargo clippy --all-targets --all-features -- -D warnings
+          - name: Tests
+            command: cargo test --verbose
+          - name: Release Build
+            command: cargo build --release --verbose
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - run: cargo clippy --all-targets --all-features -- -D warnings
-
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --verbose
-
-  build:
-    name: Release Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --release --verbose
+      - name: Install Linux MIDI build dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
+      - run: ${{ matrix.command }}
 
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check-action@v1
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo-audit and cargo registry
+        id: cargo-audit-cache
+        uses: actions/cache@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          path: |
+            ~/.cargo/bin/cargo-audit
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-audit-v1
+      - name: Install cargo-audit
+        if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked
+      - run: cargo audit

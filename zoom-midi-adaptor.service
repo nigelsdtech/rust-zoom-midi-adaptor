@@ -1,0 +1,32 @@
+[Unit]
+Description=Zoom MIDI adaptor (MS-50G)
+After=local-fs.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+SupplementaryGroups=audio
+WorkingDirectory=/etc/zoom-midi-adaptor
+Environment=RUST_LOG=info
+Environment=ZOOM_MIDI_CONFIG=/etc/zoom-midi-adaptor/pedalboard.json
+EnvironmentFile=-/etc/default/zoom-midi-adaptor
+ExecStart=/usr/local/bin/zoom-midi-adaptor ${ZOOM_MIDI_CONFIG}
+Restart=always
+RestartSec=1
+TimeoutStartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+StandardOutput=journal
+StandardError=journal
+OOMScoreAdjust=-900
+
+[Install]
+WantedBy=multi-user.target

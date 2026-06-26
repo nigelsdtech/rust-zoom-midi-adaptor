@@ -5,8 +5,8 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-User=pi
-Group=pi
+User=dietpi
+Group=dietpi
 SupplementaryGroups=audio
 WorkingDirectory=/etc/zoom-midi-adaptor
 Environment=RUST_LOG=info

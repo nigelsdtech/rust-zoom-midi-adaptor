@@ -1,6 +1,6 @@
 use std::{env, fmt::Write as _, path::PathBuf, thread, time::Duration};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, error, info};
 use midir::{Ignore, MidiInput, MidiInputPort, MidiOutput, MidiOutputConnection, MidiOutputPort};
 use zoom_midi_adaptor::config::Settings;
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
 
     let output_connection = midi_output
         .connect(&output_port, "zoom-midi-adaptor-output-connection")
-        .context("failed to open MIDI output port")?;
+        .map_err(|err| anyhow!("failed to open MIDI output port: {err}"))?;
 
     let mut callback_state = CallbackState::new(settings, output_connection);
     callback_state.send_startup_message()?;
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
             },
             callback_state,
         )
-        .context("failed to open MIDI input port")?;
+        .map_err(|err| anyhow!("failed to open MIDI input port: {err}"))?;
 
     info!("zoom-midi-adaptor is running");
 

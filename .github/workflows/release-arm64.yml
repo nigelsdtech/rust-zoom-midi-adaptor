@@ -1,0 +1,50 @@
+name: Release ARM64 Binary
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build in ARM64 environment
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: aarch64
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            apt-get install -y curl build-essential pkg-config libasound2-dev ca-certificates
+            curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+          run: |
+            set -eux
+            source "$HOME/.cargo/env"
+            rustup default stable
+            cargo build --release
+            mkdir -p dist
+            cp target/release/zoom-midi-adaptor dist/zoom-midi-adaptor-aarch64-unknown-linux-gnu
+            sha256sum dist/zoom-midi-adaptor-aarch64-unknown-linux-gnu > dist/zoom-midi-adaptor-aarch64-unknown-linux-gnu.sha256
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zoom-midi-adaptor-aarch64
+          path: dist/*
+
+      - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

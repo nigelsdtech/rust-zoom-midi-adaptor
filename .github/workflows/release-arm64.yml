@@ -11,33 +11,32 @@ permissions:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build in ARM64 environment
-        uses: uraimo/run-on-arch-action@v2
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libasound2-dev ca-certificates
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
         with:
-          arch: aarch64
-          distro: ubuntu22.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update
-            apt-get install -y curl build-essential pkg-config libasound2-dev ca-certificates clang lld
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
-          run: |
-            set -eux
-            source "$HOME/.cargo/env"
-            rustup default stable
-            export CC=clang
-            export CXX=clang++
-            export RUSTFLAGS="-C link-arg=-fuse-ld=lld"
-            cargo build --locked --release
-            mkdir -p dist
-            cp target/release/zoom-midi-adaptor dist/zoom-midi-adaptor
-            sha256sum dist/zoom-midi-adaptor > dist/zoom-midi-adaptor.sha256
+          workspaces: .
+
+      - name: Build in ARM64 environment
+        run: |
+          set -eux
+          cargo build --locked --release
+          mkdir -p dist
+          cp target/release/zoom-midi-adaptor dist/zoom-midi-adaptor
+          sha256sum dist/zoom-midi-adaptor > dist/zoom-midi-adaptor.sha256
 
       - name: Prepare deployment package
         run: |
